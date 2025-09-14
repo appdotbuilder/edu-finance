@@ -1,15 +1,27 @@
+import { db } from '../db';
+import { fundPositionsTable } from '../db/schema';
 import { type CreateFundPositionInput, type FundPosition } from '../schema';
 
-export async function createFundPosition(input: CreateFundPositionInput): Promise<FundPosition> {
-  // This is a placeholder declaration! Real code should be implemented here.
-  // The goal of this handler is creating fund position categories (like "Dana BOS", "Uang Gedung")
-  // to track and allocate money from different sources for specific purposes
-  return Promise.resolve({
-    id: 0, // Placeholder ID
-    name: input.name,
-    description: input.description || null,
-    balance: input.balance || 0,
-    created_at: new Date(),
-    updated_at: new Date()
-  } as FundPosition);
-}
+export const createFundPosition = async (input: CreateFundPositionInput): Promise<FundPosition> => {
+  try {
+    // Insert fund position record
+    const result = await db.insert(fundPositionsTable)
+      .values({
+        name: input.name,
+        description: input.description || null,
+        balance: input.balance ? input.balance.toString() : '0' // Convert number to string for numeric column
+      })
+      .returning()
+      .execute();
+
+    // Convert numeric fields back to numbers before returning
+    const fundPosition = result[0];
+    return {
+      ...fundPosition,
+      balance: parseFloat(fundPosition.balance) // Convert string back to number
+    };
+  } catch (error) {
+    console.error('Fund position creation failed:', error);
+    throw error;
+  }
+};

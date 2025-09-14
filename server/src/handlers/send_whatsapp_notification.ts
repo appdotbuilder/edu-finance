@@ -1,16 +1,29 @@
+import { db } from '../db';
+import { whatsappNotificationsTable } from '../db/schema';
 import { type SendWhatsappNotificationInput, type WhatsappNotification } from '../schema';
 
-export async function sendWhatsappNotification(input: SendWhatsappNotificationInput): Promise<WhatsappNotification> {
-  // This is a placeholder declaration! Real code should be implemented here.
-  // The goal of this handler is sending WhatsApp notifications for bill reminders,
-  // payment confirmations, and general announcements to students and parents
-  return Promise.resolve({
-    id: 0, // Placeholder ID
-    phone: input.phone,
-    message: input.message,
-    type: input.type,
-    status: 'PENDING',
-    sent_at: null,
-    created_at: new Date()
-  } as WhatsappNotification);
-}
+export const sendWhatsappNotification = async (input: SendWhatsappNotificationInput): Promise<WhatsappNotification> => {
+  try {
+    // Insert WhatsApp notification record
+    const result = await db.insert(whatsappNotificationsTable)
+      .values({
+        phone: input.phone,
+        message: input.message,
+        type: input.type,
+        status: 'PENDING', // Default status for new notifications
+        sent_at: null // Will be updated when actually sent
+      })
+      .returning()
+      .execute();
+
+    const notification = result[0];
+    
+    return {
+      ...notification,
+      sent_at: notification.sent_at // already nullable, no conversion needed
+    };
+  } catch (error) {
+    console.error('WhatsApp notification creation failed:', error);
+    throw error;
+  }
+};

@@ -1,8 +1,22 @@
+import { db } from '../db';
+import { accountsTable } from '../db/schema';
 import { type Account } from '../schema';
+import { desc } from 'drizzle-orm';
 
 export async function getAccounts(): Promise<Account[]> {
-  // This is a placeholder declaration! Real code should be implemented here.
-  // The goal of this handler is fetching all accounts (cash and bank) with current balances
-  // for financial position tracking and transaction management
-  return Promise.resolve([] as Account[]);
+  try {
+    const results = await db.select()
+      .from(accountsTable)
+      .orderBy(desc(accountsTable.created_at))
+      .execute();
+
+    // Convert numeric fields back to numbers before returning
+    return results.map(account => ({
+      ...account,
+      balance: parseFloat(account.balance) // Convert string back to number
+    }));
+  } catch (error) {
+    console.error('Failed to fetch accounts:', error);
+    throw error;
+  }
 }

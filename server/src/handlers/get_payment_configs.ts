@@ -1,8 +1,23 @@
+import { db } from '../db';
+import { paymentConfigsTable } from '../db/schema';
 import { type PaymentConfig } from '../schema';
+import { eq } from 'drizzle-orm';
 
-export async function getPaymentConfigs(): Promise<PaymentConfig[]> {
-  // This is a placeholder declaration! Real code should be implemented here.
-  // The goal of this handler is fetching all active payment configurations
-  // with their associated grade, class, and student restrictions
-  return Promise.resolve([] as PaymentConfig[]);
-}
+export const getPaymentConfigs = async (): Promise<PaymentConfig[]> => {
+  try {
+    // Query all active payment configurations
+    const results = await db.select()
+      .from(paymentConfigsTable)
+      .where(eq(paymentConfigsTable.is_active, true))
+      .execute();
+
+    // Convert numeric fields back to numbers before returning
+    return results.map(config => ({
+      ...config,
+      amount: parseFloat(config.amount) // Convert string back to number
+    }));
+  } catch (error) {
+    console.error('Failed to fetch payment configurations:', error);
+    throw error;
+  }
+};

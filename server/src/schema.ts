@@ -1,277 +1,293 @@
 import { z } from 'zod';
 
 // Enums
-export const userRoleEnum = z.enum(['admin', 'operator', 'cashier']);
-export const paymentTypeEnum = z.enum(['spp', 'uang_gedung', 'daftar_ulang', 'uang_ujian', 'uang_seragam', 'uang_buku', 'study_tour', 'tabungan', 'custom']);
-export const paymentStatusEnum = z.enum(['pending', 'partial', 'paid']);
-export const transactionTypeEnum = z.enum(['income', 'expense', 'transfer']);
-export const accountTypeEnum = z.enum(['cash', 'bank']);
-export const gradeEnum = z.enum(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']);
+export const gradeSchema = z.enum(['TK', 'SD', 'SMP', 'SMA', 'SMK']);
+export type Grade = z.infer<typeof gradeSchema>;
 
-// User schemas
-export const userSchema = z.object({
-  id: z.number(),
-  username: z.string(),
-  password_hash: z.string(),
-  full_name: z.string(),
-  role: userRoleEnum,
-  is_active: z.boolean(),
-  created_at: z.coerce.date(),
-  updated_at: z.coerce.date().nullable()
-});
+export const paymentTypeSchema = z.enum([
+  'SPP', 
+  'UANG_GEDUNG', 
+  'DAFTAR_ULANG', 
+  'UANG_UJIAN', 
+  'UANG_SERAGAM', 
+  'UANG_BUKU', 
+  'STUDY_TOUR', 
+  'TABUNGAN', 
+  'LAINNYA'
+]);
+export type PaymentType = z.infer<typeof paymentTypeSchema>;
 
-export type User = z.infer<typeof userSchema>;
+export const transactionTypeSchema = z.enum(['INCOME', 'EXPENSE', 'TRANSFER']);
+export type TransactionType = z.infer<typeof transactionTypeSchema>;
 
-export const createUserInputSchema = z.object({
-  username: z.string().min(3).max(50),
-  password: z.string().min(6),
-  full_name: z.string().min(1),
-  role: userRoleEnum
-});
+export const accountTypeSchema = z.enum(['CASH', 'BANK']);
+export type AccountType = z.infer<typeof accountTypeSchema>;
 
-export type CreateUserInput = z.infer<typeof createUserInputSchema>;
+export const studentStatusSchema = z.enum(['ACTIVE', 'INACTIVE', 'GRADUATED']);
+export type StudentStatus = z.infer<typeof studentStatusSchema>;
 
-// Student schemas
+// Student schema
 export const studentSchema = z.object({
   id: z.number(),
-  student_id: z.string(),
+  nis: z.string(),
   name: z.string(),
-  grade: gradeEnum,
+  grade: gradeSchema,
   class_name: z.string(),
   phone: z.string().nullable(),
   parent_phone: z.string().nullable(),
   address: z.string().nullable(),
-  is_active: z.boolean(),
-  barcode: z.string().nullable(),
+  status: studentStatusSchema,
   created_at: z.coerce.date(),
-  updated_at: z.coerce.date().nullable()
+  updated_at: z.coerce.date()
 });
 
 export type Student = z.infer<typeof studentSchema>;
 
-export const createStudentInputSchema = z.object({
-  student_id: z.string(),
-  name: z.string().min(1),
-  grade: gradeEnum,
-  class_name: z.string(),
-  phone: z.string().optional(),
-  parent_phone: z.string().optional(),
-  address: z.string().optional()
-});
-
-export type CreateStudentInput = z.infer<typeof createStudentInputSchema>;
-
-// Payment type configuration schemas
-export const paymentTypeConfigSchema = z.object({
+// Payment configuration schema
+export const paymentConfigSchema = z.object({
   id: z.number(),
+  payment_type: paymentTypeSchema,
   name: z.string(),
-  type: paymentTypeEnum,
+  description: z.string().nullable(),
   amount: z.number(),
-  is_installment_allowed: z.boolean(),
+  grade: gradeSchema.nullable(),
+  class_name: z.string().nullable(),
+  student_id: z.number().nullable(),
   is_active: z.boolean(),
+  can_installment: z.boolean(),
   created_at: z.coerce.date(),
-  updated_at: z.coerce.date().nullable()
+  updated_at: z.coerce.date()
 });
 
-export type PaymentTypeConfig = z.infer<typeof paymentTypeConfigSchema>;
+export type PaymentConfig = z.infer<typeof paymentConfigSchema>;
 
-export const createPaymentTypeConfigInputSchema = z.object({
-  name: z.string().min(1),
-  type: paymentTypeEnum,
-  amount: z.number().positive(),
-  is_installment_allowed: z.boolean().default(true)
-});
-
-export type CreatePaymentTypeConfigInput = z.infer<typeof createPaymentTypeConfigInputSchema>;
-
-// Student payment assignment schemas
-export const studentPaymentAssignmentSchema = z.object({
+// Student payment schema
+export const studentPaymentSchema = z.object({
   id: z.number(),
   student_id: z.number(),
-  payment_type_config_id: z.number(),
-  custom_amount: z.number().nullable(),
-  discount_amount: z.number().nullable(),
-  is_exempt: z.boolean(),
-  created_at: z.coerce.date()
+  payment_config_id: z.number(),
+  amount_due: z.number(),
+  amount_paid: z.number(),
+  amount_remaining: z.number(),
+  due_date: z.coerce.date().nullable(),
+  status: z.enum(['PENDING', 'PARTIAL', 'PAID']),
+  created_at: z.coerce.date(),
+  updated_at: z.coerce.date()
 });
 
-export type StudentPaymentAssignment = z.infer<typeof studentPaymentAssignmentSchema>;
+export type StudentPayment = z.infer<typeof studentPaymentSchema>;
 
-export const createStudentPaymentAssignmentInputSchema = z.object({
-  student_id: z.number(),
-  payment_type_config_id: z.number(),
-  custom_amount: z.number().positive().optional(),
-  discount_amount: z.number().nonnegative().optional(),
-  is_exempt: z.boolean().default(false)
-});
-
-export type CreateStudentPaymentAssignmentInput = z.infer<typeof createStudentPaymentAssignmentInputSchema>;
-
-// Payment transaction schemas
-export const paymentTransactionSchema = z.object({
-  id: z.number(),
-  student_id: z.number(),
-  payment_type_config_id: z.number(),
-  amount: z.number(),
-  payment_date: z.coerce.date(),
-  receipt_number: z.string(),
-  notes: z.string().nullable(),
-  operator_id: z.number(),
-  created_at: z.coerce.date()
-});
-
-export type PaymentTransaction = z.infer<typeof paymentTransactionSchema>;
-
-export const createPaymentTransactionInputSchema = z.object({
-  student_id: z.number(),
-  payment_type_config_id: z.number(),
-  amount: z.number().positive(),
-  payment_date: z.coerce.date().optional().default(() => new Date()),
-  notes: z.string().optional(),
-  operator_id: z.number()
-});
-
-export type CreatePaymentTransactionInput = z.infer<typeof createPaymentTransactionInputSchema>;
-
-// Account schemas (for cash and bank accounts)
+// Account schema
 export const accountSchema = z.object({
   id: z.number(),
   name: z.string(),
-  type: accountTypeEnum,
-  account_number: z.string().nullable(),
+  type: accountTypeSchema,
   bank_name: z.string().nullable(),
+  account_number: z.string().nullable(),
   balance: z.number(),
   is_active: z.boolean(),
   created_at: z.coerce.date(),
-  updated_at: z.coerce.date().nullable()
+  updated_at: z.coerce.date()
 });
 
 export type Account = z.infer<typeof accountSchema>;
 
-export const createAccountInputSchema = z.object({
-  name: z.string().min(1),
-  type: accountTypeEnum,
-  account_number: z.string().optional(),
-  bank_name: z.string().optional(),
-  initial_balance: z.number().default(0)
-});
-
-export type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
-
-// Fund source schemas (for tracking different types of funds)
-export const fundSourceSchema = z.object({
+// Fund position schema
+export const fundPositionSchema = z.object({
   id: z.number(),
   name: z.string(),
   description: z.string().nullable(),
   balance: z.number(),
-  is_active: z.boolean(),
   created_at: z.coerce.date(),
-  updated_at: z.coerce.date().nullable()
+  updated_at: z.coerce.date()
 });
 
-export type FundSource = z.infer<typeof fundSourceSchema>;
+export type FundPosition = z.infer<typeof fundPositionSchema>;
 
-export const createFundSourceInputSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  initial_balance: z.number().default(0)
-});
-
-export type CreateFundSourceInput = z.infer<typeof createFundSourceInputSchema>;
-
-// General transaction schemas (for income/expense/transfers)
+// Transaction schema
 export const transactionSchema = z.object({
   id: z.number(),
-  type: transactionTypeEnum,
+  type: transactionTypeSchema,
   amount: z.number(),
   description: z.string(),
-  transaction_date: z.coerce.date(),
-  account_id: z.number(),
-  fund_source_id: z.number().nullable(),
   reference_number: z.string().nullable(),
-  operator_id: z.number(),
+  account_id: z.number(),
+  fund_position_id: z.number().nullable(),
+  student_payment_id: z.number().nullable(),
+  created_by: z.string(),
   created_at: z.coerce.date()
 });
 
 export type Transaction = z.infer<typeof transactionSchema>;
 
-export const createTransactionInputSchema = z.object({
-  type: transactionTypeEnum,
-  amount: z.number().positive(),
-  description: z.string().min(1),
-  transaction_date: z.coerce.date().optional().default(() => new Date()),
-  account_id: z.number(),
-  fund_source_id: z.number().optional(),
-  reference_number: z.string().optional(),
-  operator_id: z.number()
-});
-
-export type CreateTransactionInput = z.infer<typeof createTransactionInputSchema>;
-
-// Student savings schemas
-export const studentSavingsSchema = z.object({
+// Savings schema
+export const savingsSchema = z.object({
   id: z.number(),
   student_id: z.number(),
+  balance: z.number(),
+  created_at: z.coerce.date(),
+  updated_at: z.coerce.date()
+});
+
+export type Savings = z.infer<typeof savingsSchema>;
+
+// Savings transaction schema
+export const savingsTransactionSchema = z.object({
+  id: z.number(),
+  savings_id: z.number(),
+  type: z.enum(['DEPOSIT', 'WITHDRAWAL']),
   amount: z.number(),
-  type: z.enum(['deposit', 'withdrawal']),
-  transaction_date: z.coerce.date(),
-  notes: z.string().nullable(),
-  operator_id: z.number(),
+  description: z.string().nullable(),
+  created_by: z.string(),
   created_at: z.coerce.date()
 });
 
-export type StudentSavings = z.infer<typeof studentSavingsSchema>;
+export type SavingsTransaction = z.infer<typeof savingsTransactionSchema>;
 
-export const createStudentSavingsInputSchema = z.object({
+// SPP card schema
+export const sppCardSchema = z.object({
+  id: z.number(),
   student_id: z.number(),
-  amount: z.number().positive(),
-  type: z.enum(['deposit', 'withdrawal']),
-  transaction_date: z.coerce.date().optional().default(() => new Date()),
-  notes: z.string().optional(),
-  operator_id: z.number()
+  barcode: z.string(),
+  is_active: z.boolean(),
+  created_at: z.coerce.date(),
+  updated_at: z.coerce.date()
 });
 
-export type CreateStudentSavingsInput = z.infer<typeof createStudentSavingsInputSchema>;
+export type SppCard = z.infer<typeof sppCardSchema>;
 
-// WhatsApp notification schemas
+// WhatsApp notification schema
 export const whatsappNotificationSchema = z.object({
   id: z.number(),
-  phone_number: z.string(),
+  phone: z.string(),
   message: z.string(),
-  status: z.enum(['pending', 'sent', 'failed']),
+  type: z.enum(['BILL_REMINDER', 'PAYMENT_CONFIRMATION', 'ANNOUNCEMENT']),
+  status: z.enum(['PENDING', 'SENT', 'FAILED']),
   sent_at: z.coerce.date().nullable(),
-  error_message: z.string().nullable(),
   created_at: z.coerce.date()
 });
 
 export type WhatsappNotification = z.infer<typeof whatsappNotificationSchema>;
 
-export const createWhatsappNotificationInputSchema = z.object({
-  phone_number: z.string(),
-  message: z.string().min(1)
+// Input schemas for creating entities
+export const createStudentInputSchema = z.object({
+  nis: z.string(),
+  name: z.string(),
+  grade: gradeSchema,
+  class_name: z.string(),
+  phone: z.string().nullable().optional(),
+  parent_phone: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+  status: studentStatusSchema.optional()
 });
 
-export type CreateWhatsappNotificationInput = z.infer<typeof createWhatsappNotificationInputSchema>;
+export type CreateStudentInput = z.infer<typeof createStudentInputSchema>;
 
-// Report request schemas
-export const reportRequestSchema = z.object({
-  report_type: z.enum([
-    'daily_income',
-    'monthly_recap',
-    'yearly_recap',
-    'student_outstanding',
-    'class_outstanding',
-    'all_outstanding',
-    'balance_report',
-    'cash_position',
-    'payment_history',
-    'savings_report'
-  ]),
-  start_date: z.coerce.date().optional(),
-  end_date: z.coerce.date().optional(),
-  student_id: z.number().optional(),
+export const createPaymentConfigInputSchema = z.object({
+  payment_type: paymentTypeSchema,
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  amount: z.number().positive(),
+  grade: gradeSchema.nullable().optional(),
+  class_name: z.string().nullable().optional(),
+  student_id: z.number().nullable().optional(),
+  can_installment: z.boolean().optional()
+});
+
+export type CreatePaymentConfigInput = z.infer<typeof createPaymentConfigInputSchema>;
+
+export const createTransactionInputSchema = z.object({
+  type: transactionTypeSchema,
+  amount: z.number().positive(),
+  description: z.string(),
+  reference_number: z.string().nullable().optional(),
+  account_id: z.number(),
+  fund_position_id: z.number().nullable().optional(),
+  student_payment_id: z.number().nullable().optional(),
+  created_by: z.string()
+});
+
+export type CreateTransactionInput = z.infer<typeof createTransactionInputSchema>;
+
+export const createAccountInputSchema = z.object({
+  name: z.string(),
+  type: accountTypeSchema,
+  bank_name: z.string().nullable().optional(),
+  account_number: z.string().nullable().optional(),
+  balance: z.number().optional()
+});
+
+export type CreateAccountInput = z.infer<typeof createAccountInputSchema>;
+
+export const createFundPositionInputSchema = z.object({
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  balance: z.number().optional()
+});
+
+export type CreateFundPositionInput = z.infer<typeof createFundPositionInputSchema>;
+
+export const createSavingsTransactionInputSchema = z.object({
+  student_id: z.number(),
+  type: z.enum(['DEPOSIT', 'WITHDRAWAL']),
+  amount: z.number().positive(),
+  description: z.string().nullable().optional(),
+  created_by: z.string()
+});
+
+export type CreateSavingsTransactionInput = z.infer<typeof createSavingsTransactionInputSchema>;
+
+export const processPaymentInputSchema = z.object({
+  student_payment_id: z.number(),
+  amount: z.number().positive(),
+  account_id: z.number(),
+  created_by: z.string(),
+  reference_number: z.string().nullable().optional()
+});
+
+export type ProcessPaymentInput = z.infer<typeof processPaymentInputSchema>;
+
+export const generateSppCardInputSchema = z.object({
+  student_id: z.number()
+});
+
+export type GenerateSppCardInput = z.infer<typeof generateSppCardInputSchema>;
+
+export const sendWhatsappNotificationInputSchema = z.object({
+  phone: z.string(),
+  message: z.string(),
+  type: z.enum(['BILL_REMINDER', 'PAYMENT_CONFIRMATION', 'ANNOUNCEMENT'])
+});
+
+export type SendWhatsappNotificationInput = z.infer<typeof sendWhatsappNotificationInputSchema>;
+
+// Query schemas
+export const getStudentsQuerySchema = z.object({
+  grade: gradeSchema.optional(),
   class_name: z.string().optional(),
-  grade: gradeEnum.optional()
+  status: studentStatusSchema.optional(),
+  search: z.string().optional()
 });
 
-export type ReportRequest = z.infer<typeof reportRequestSchema>;
+export type GetStudentsQuery = z.infer<typeof getStudentsQuerySchema>;
+
+export const getTransactionsQuerySchema = z.object({
+  type: transactionTypeSchema.optional(),
+  account_id: z.number().optional(),
+  date_from: z.string().optional(),
+  date_to: z.string().optional(),
+  limit: z.number().int().positive().optional(),
+  offset: z.number().int().nonnegative().optional()
+});
+
+export type GetTransactionsQuery = z.infer<typeof getTransactionsQuerySchema>;
+
+export const getStudentPaymentsQuerySchema = z.object({
+  student_id: z.number().optional(),
+  payment_type: paymentTypeSchema.optional(),
+  status: z.enum(['PENDING', 'PARTIAL', 'PAID']).optional(),
+  grade: gradeSchema.optional(),
+  class_name: z.string().optional()
+});
+
+export type GetStudentPaymentsQuery = z.infer<typeof getStudentPaymentsQuerySchema>;

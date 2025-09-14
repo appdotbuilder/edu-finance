@@ -1,15 +1,14 @@
-import { type StudentSavings } from '../schema';
+import { type Savings } from '../schema';
 
-export const getStudentSavings = async (studentId: number): Promise<StudentSavings[]> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is fetching savings history for a specific student.
-    // Should provide transaction history and current balance calculation
-    return [];
-};
-
-export const getStudentSavingsBalance = async (studentId: number): Promise<number> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is calculating current savings balance for a student.
-    // Should sum all deposits and subtract all withdrawals
-    return 0;
-};
+export async function getStudentSavings(studentId: number): Promise<Savings | null> {
+  // This is a placeholder declaration! Real code should be implemented here.
+  // The goal of this handler is fetching student's savings account information
+  // including current balance and transaction history
+  return Promise.resolve({
+    id: 0, // Placeholder ID
+    student_id: studentId,
+    balance: 0,
+    created_at: new Date(),
+    updated_at: new Date()
+  } as Savings);
+}

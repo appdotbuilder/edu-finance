@@ -1,251 +1,269 @@
-import { serial, text, pgTable, timestamp, numeric, integer, boolean, pgEnum, varchar } from 'drizzle-orm/pg-core';
+import { 
+  serial, 
+  text, 
+  pgTable, 
+  timestamp, 
+  numeric, 
+  integer, 
+  boolean,
+  pgEnum,
+  unique,
+  index
+} from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Enums
-export const userRoleEnum = pgEnum('user_role', ['admin', 'operator', 'cashier']);
-export const paymentTypeEnum = pgEnum('payment_type', ['spp', 'uang_gedung', 'daftar_ulang', 'uang_ujian', 'uang_seragam', 'uang_buku', 'study_tour', 'tabungan', 'custom']);
-export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'partial', 'paid']);
-export const transactionTypeEnum = pgEnum('transaction_type', ['income', 'expense', 'transfer']);
-export const accountTypeEnum = pgEnum('account_type', ['cash', 'bank']);
-export const gradeEnum = pgEnum('grade', ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']);
-export const savingsTypeEnum = pgEnum('savings_type', ['deposit', 'withdrawal']);
-export const notificationStatusEnum = pgEnum('notification_status', ['pending', 'sent', 'failed']);
-
-// Users table
-export const usersTable = pgTable('users', {
-  id: serial('id').primaryKey(),
-  username: varchar('username', { length: 50 }).notNull().unique(),
-  password_hash: text('password_hash').notNull(),
-  full_name: varchar('full_name', { length: 100 }).notNull(),
-  role: userRoleEnum('role').notNull(),
-  is_active: boolean('is_active').default(true).notNull(),
-  created_at: timestamp('created_at').defaultNow().notNull(),
-  updated_at: timestamp('updated_at')
-});
+export const gradeEnum = pgEnum('grade', ['TK', 'SD', 'SMP', 'SMA', 'SMK']);
+export const paymentTypeEnum = pgEnum('payment_type', [
+  'SPP', 
+  'UANG_GEDUNG', 
+  'DAFTAR_ULANG', 
+  'UANG_UJIAN', 
+  'UANG_SERAGAM', 
+  'UANG_BUKU', 
+  'STUDY_TOUR', 
+  'TABUNGAN', 
+  'LAINNYA'
+]);
+export const transactionTypeEnum = pgEnum('transaction_type', ['INCOME', 'EXPENSE', 'TRANSFER']);
+export const accountTypeEnum = pgEnum('account_type', ['CASH', 'BANK']);
+export const studentStatusEnum = pgEnum('student_status', ['ACTIVE', 'INACTIVE', 'GRADUATED']);
+export const paymentStatusEnum = pgEnum('payment_status', ['PENDING', 'PARTIAL', 'PAID']);
+export const savingsTransactionTypeEnum = pgEnum('savings_transaction_type', ['DEPOSIT', 'WITHDRAWAL']);
+export const notificationTypeEnum = pgEnum('notification_type', ['BILL_REMINDER', 'PAYMENT_CONFIRMATION', 'ANNOUNCEMENT']);
+export const notificationStatusEnum = pgEnum('notification_status', ['PENDING', 'SENT', 'FAILED']);
 
 // Students table
 export const studentsTable = pgTable('students', {
   id: serial('id').primaryKey(),
-  student_id: varchar('student_id', { length: 20 }).notNull().unique(),
-  name: varchar('name', { length: 100 }).notNull(),
+  nis: text('nis').notNull().unique(),
+  name: text('name').notNull(),
   grade: gradeEnum('grade').notNull(),
-  class_name: varchar('class_name', { length: 10 }).notNull(),
-  phone: varchar('phone', { length: 20 }),
-  parent_phone: varchar('parent_phone', { length: 20 }),
+  class_name: text('class_name').notNull(),
+  phone: text('phone'),
+  parent_phone: text('parent_phone'),
   address: text('address'),
-  is_active: boolean('is_active').default(true).notNull(),
-  barcode: varchar('barcode', { length: 50 }).unique(),
+  status: studentStatusEnum('status').notNull().default('ACTIVE'),
   created_at: timestamp('created_at').defaultNow().notNull(),
-  updated_at: timestamp('updated_at')
-});
+  updated_at: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  gradeClassIdx: index('students_grade_class_idx').on(table.grade, table.class_name),
+  statusIdx: index('students_status_idx').on(table.status),
+}));
 
-// Payment type configurations table
-export const paymentTypeConfigsTable = pgTable('payment_type_configs', {
+// Payment configurations table
+export const paymentConfigsTable = pgTable('payment_configs', {
   id: serial('id').primaryKey(),
-  name: varchar('name', { length: 100 }).notNull(),
-  type: paymentTypeEnum('type').notNull(),
-  amount: numeric('amount', { precision: 15, scale: 2 }).notNull(),
-  is_installment_allowed: boolean('is_installment_allowed').default(true).notNull(),
-  is_active: boolean('is_active').default(true).notNull(),
+  payment_type: paymentTypeEnum('payment_type').notNull(),
+  name: text('name').notNull(),
+  description: text('description'),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  grade: gradeEnum('grade'),
+  class_name: text('class_name'),
+  student_id: integer('student_id').references(() => studentsTable.id),
+  is_active: boolean('is_active').notNull().default(true),
+  can_installment: boolean('can_installment').notNull().default(false),
   created_at: timestamp('created_at').defaultNow().notNull(),
-  updated_at: timestamp('updated_at')
-});
+  updated_at: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  paymentTypeIdx: index('payment_configs_payment_type_idx').on(table.payment_type),
+  gradeClassIdx: index('payment_configs_grade_class_idx').on(table.grade, table.class_name),
+}));
 
-// Student payment assignments table (for custom amounts and exemptions)
-export const studentPaymentAssignmentsTable = pgTable('student_payment_assignments', {
+// Student payments table
+export const studentPaymentsTable = pgTable('student_payments', {
   id: serial('id').primaryKey(),
   student_id: integer('student_id').notNull().references(() => studentsTable.id),
-  payment_type_config_id: integer('payment_type_config_id').notNull().references(() => paymentTypeConfigsTable.id),
-  custom_amount: numeric('custom_amount', { precision: 15, scale: 2 }),
-  discount_amount: numeric('discount_amount', { precision: 15, scale: 2 }),
-  is_exempt: boolean('is_exempt').default(false).notNull(),
-  created_at: timestamp('created_at').defaultNow().notNull()
-});
+  payment_config_id: integer('payment_config_id').notNull().references(() => paymentConfigsTable.id),
+  amount_due: numeric('amount_due', { precision: 12, scale: 2 }).notNull(),
+  amount_paid: numeric('amount_paid', { precision: 12, scale: 2 }).notNull().default('0'),
+  amount_remaining: numeric('amount_remaining', { precision: 12, scale: 2 }).notNull(),
+  due_date: timestamp('due_date'),
+  status: paymentStatusEnum('status').notNull().default('PENDING'),
+  created_at: timestamp('created_at').defaultNow().notNull(),
+  updated_at: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  studentIdx: index('student_payments_student_idx').on(table.student_id),
+  statusIdx: index('student_payments_status_idx').on(table.status),
+  dueDateIdx: index('student_payments_due_date_idx').on(table.due_date),
+}));
 
-// Payment transactions table
-export const paymentTransactionsTable = pgTable('payment_transactions', {
-  id: serial('id').primaryKey(),
-  student_id: integer('student_id').notNull().references(() => studentsTable.id),
-  payment_type_config_id: integer('payment_type_config_id').notNull().references(() => paymentTypeConfigsTable.id),
-  amount: numeric('amount', { precision: 15, scale: 2 }).notNull(),
-  payment_date: timestamp('payment_date').notNull(),
-  receipt_number: varchar('receipt_number', { length: 50 }).notNull().unique(),
-  notes: text('notes'),
-  operator_id: integer('operator_id').notNull().references(() => usersTable.id),
-  created_at: timestamp('created_at').defaultNow().notNull()
-});
-
-// Accounts table (cash and bank accounts)
+// Accounts table
 export const accountsTable = pgTable('accounts', {
   id: serial('id').primaryKey(),
-  name: varchar('name', { length: 100 }).notNull(),
+  name: text('name').notNull(),
   type: accountTypeEnum('type').notNull(),
-  account_number: varchar('account_number', { length: 50 }),
-  bank_name: varchar('bank_name', { length: 100 }),
-  balance: numeric('balance', { precision: 15, scale: 2 }).default('0').notNull(),
-  is_active: boolean('is_active').default(true).notNull(),
+  bank_name: text('bank_name'),
+  account_number: text('account_number'),
+  balance: numeric('balance', { precision: 15, scale: 2 }).notNull().default('0'),
+  is_active: boolean('is_active').notNull().default(true),
   created_at: timestamp('created_at').defaultNow().notNull(),
-  updated_at: timestamp('updated_at')
-});
+  updated_at: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  typeIdx: index('accounts_type_idx').on(table.type),
+}));
 
-// Fund sources table (for tracking different types of funds like Dana BOS)
-export const fundSourcesTable = pgTable('fund_sources', {
+// Fund positions table
+export const fundPositionsTable = pgTable('fund_positions', {
   id: serial('id').primaryKey(),
-  name: varchar('name', { length: 100 }).notNull(),
+  name: text('name').notNull(),
   description: text('description'),
-  balance: numeric('balance', { precision: 15, scale: 2 }).default('0').notNull(),
-  is_active: boolean('is_active').default(true).notNull(),
+  balance: numeric('balance', { precision: 15, scale: 2 }).notNull().default('0'),
   created_at: timestamp('created_at').defaultNow().notNull(),
-  updated_at: timestamp('updated_at')
+  updated_at: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// General transactions table (income, expense, transfers)
+// Transactions table
 export const transactionsTable = pgTable('transactions', {
   id: serial('id').primaryKey(),
   type: transactionTypeEnum('type').notNull(),
-  amount: numeric('amount', { precision: 15, scale: 2 }).notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
   description: text('description').notNull(),
-  transaction_date: timestamp('transaction_date').notNull(),
+  reference_number: text('reference_number'),
   account_id: integer('account_id').notNull().references(() => accountsTable.id),
-  fund_source_id: integer('fund_source_id').references(() => fundSourcesTable.id),
-  reference_number: varchar('reference_number', { length: 50 }),
-  operator_id: integer('operator_id').notNull().references(() => usersTable.id),
-  created_at: timestamp('created_at').defaultNow().notNull()
+  fund_position_id: integer('fund_position_id').references(() => fundPositionsTable.id),
+  student_payment_id: integer('student_payment_id').references(() => studentPaymentsTable.id),
+  created_by: text('created_by').notNull(),
+  created_at: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  typeIdx: index('transactions_type_idx').on(table.type),
+  accountIdx: index('transactions_account_idx').on(table.account_id),
+  createdAtIdx: index('transactions_created_at_idx').on(table.created_at),
+  referenceIdx: index('transactions_reference_idx').on(table.reference_number),
+}));
+
+// Savings table
+export const savingsTable = pgTable('savings', {
+  id: serial('id').primaryKey(),
+  student_id: integer('student_id').notNull().references(() => studentsTable.id).unique(),
+  balance: numeric('balance', { precision: 12, scale: 2 }).notNull().default('0'),
+  created_at: timestamp('created_at').defaultNow().notNull(),
+  updated_at: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// Student savings table
-export const studentSavingsTable = pgTable('student_savings', {
+// Savings transactions table
+export const savingsTransactionsTable = pgTable('savings_transactions', {
+  id: serial('id').primaryKey(),
+  savings_id: integer('savings_id').notNull().references(() => savingsTable.id),
+  type: savingsTransactionTypeEnum('type').notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  description: text('description'),
+  created_by: text('created_by').notNull(),
+  created_at: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  savingsIdx: index('savings_transactions_savings_idx').on(table.savings_id),
+  typeIdx: index('savings_transactions_type_idx').on(table.type),
+}));
+
+// SPP cards table
+export const sppCardsTable = pgTable('spp_cards', {
   id: serial('id').primaryKey(),
   student_id: integer('student_id').notNull().references(() => studentsTable.id),
-  amount: numeric('amount', { precision: 15, scale: 2 }).notNull(),
-  type: savingsTypeEnum('type').notNull(),
-  transaction_date: timestamp('transaction_date').notNull(),
-  notes: text('notes'),
-  operator_id: integer('operator_id').notNull().references(() => usersTable.id),
-  created_at: timestamp('created_at').defaultNow().notNull()
-});
+  barcode: text('barcode').notNull().unique(),
+  is_active: boolean('is_active').notNull().default(true),
+  created_at: timestamp('created_at').defaultNow().notNull(),
+  updated_at: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  barcodeIdx: index('spp_cards_barcode_idx').on(table.barcode),
+}));
 
 // WhatsApp notifications table
 export const whatsappNotificationsTable = pgTable('whatsapp_notifications', {
   id: serial('id').primaryKey(),
-  phone_number: varchar('phone_number', { length: 20 }).notNull(),
+  phone: text('phone').notNull(),
   message: text('message').notNull(),
-  status: notificationStatusEnum('status').default('pending').notNull(),
+  type: notificationTypeEnum('type').notNull(),
+  status: notificationStatusEnum('status').notNull().default('PENDING'),
   sent_at: timestamp('sent_at'),
-  error_message: text('error_message'),
-  created_at: timestamp('created_at').defaultNow().notNull()
-});
+  created_at: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  statusIdx: index('whatsapp_notifications_status_idx').on(table.status),
+  typeIdx: index('whatsapp_notifications_type_idx').on(table.type),
+}));
 
 // Relations
-export const usersRelations = relations(usersTable, ({ many }) => ({
-  paymentTransactions: many(paymentTransactionsTable),
+export const studentsRelations = relations(studentsTable, ({ many, one }) => ({
+  paymentConfigs: many(paymentConfigsTable),
+  studentPayments: many(studentPaymentsTable),
+  savings: one(savingsTable),
+  sppCards: many(sppCardsTable),
+}));
+
+export const paymentConfigsRelations = relations(paymentConfigsTable, ({ one, many }) => ({
+  student: one(studentsTable, {
+    fields: [paymentConfigsTable.student_id],
+    references: [studentsTable.id],
+  }),
+  studentPayments: many(studentPaymentsTable),
+}));
+
+export const studentPaymentsRelations = relations(studentPaymentsTable, ({ one, many }) => ({
+  student: one(studentsTable, {
+    fields: [studentPaymentsTable.student_id],
+    references: [studentsTable.id],
+  }),
+  paymentConfig: one(paymentConfigsTable, {
+    fields: [studentPaymentsTable.payment_config_id],
+    references: [paymentConfigsTable.id],
+  }),
   transactions: many(transactionsTable),
-  studentSavings: many(studentSavingsTable)
-}));
-
-export const studentsRelations = relations(studentsTable, ({ many }) => ({
-  paymentAssignments: many(studentPaymentAssignmentsTable),
-  paymentTransactions: many(paymentTransactionsTable),
-  studentSavings: many(studentSavingsTable)
-}));
-
-export const paymentTypeConfigsRelations = relations(paymentTypeConfigsTable, ({ many }) => ({
-  paymentAssignments: many(studentPaymentAssignmentsTable),
-  paymentTransactions: many(paymentTransactionsTable)
-}));
-
-export const studentPaymentAssignmentsRelations = relations(studentPaymentAssignmentsTable, ({ one }) => ({
-  student: one(studentsTable, {
-    fields: [studentPaymentAssignmentsTable.student_id],
-    references: [studentsTable.id]
-  }),
-  paymentTypeConfig: one(paymentTypeConfigsTable, {
-    fields: [studentPaymentAssignmentsTable.payment_type_config_id],
-    references: [paymentTypeConfigsTable.id]
-  })
-}));
-
-export const paymentTransactionsRelations = relations(paymentTransactionsTable, ({ one }) => ({
-  student: one(studentsTable, {
-    fields: [paymentTransactionsTable.student_id],
-    references: [studentsTable.id]
-  }),
-  paymentTypeConfig: one(paymentTypeConfigsTable, {
-    fields: [paymentTransactionsTable.payment_type_config_id],
-    references: [paymentTypeConfigsTable.id]
-  }),
-  operator: one(usersTable, {
-    fields: [paymentTransactionsTable.operator_id],
-    references: [usersTable.id]
-  })
 }));
 
 export const accountsRelations = relations(accountsTable, ({ many }) => ({
-  transactions: many(transactionsTable)
+  transactions: many(transactionsTable),
 }));
 
-export const fundSourcesRelations = relations(fundSourcesTable, ({ many }) => ({
-  transactions: many(transactionsTable)
+export const fundPositionsRelations = relations(fundPositionsTable, ({ many }) => ({
+  transactions: many(transactionsTable),
 }));
 
 export const transactionsRelations = relations(transactionsTable, ({ one }) => ({
   account: one(accountsTable, {
     fields: [transactionsTable.account_id],
-    references: [accountsTable.id]
+    references: [accountsTable.id],
   }),
-  fundSource: one(fundSourcesTable, {
-    fields: [transactionsTable.fund_source_id],
-    references: [fundSourcesTable.id]
+  fundPosition: one(fundPositionsTable, {
+    fields: [transactionsTable.fund_position_id],
+    references: [fundPositionsTable.id],
   }),
-  operator: one(usersTable, {
-    fields: [transactionsTable.operator_id],
-    references: [usersTable.id]
-  })
+  studentPayment: one(studentPaymentsTable, {
+    fields: [transactionsTable.student_payment_id],
+    references: [studentPaymentsTable.id],
+  }),
 }));
 
-export const studentSavingsRelations = relations(studentSavingsTable, ({ one }) => ({
+export const savingsRelations = relations(savingsTable, ({ one, many }) => ({
   student: one(studentsTable, {
-    fields: [studentSavingsTable.student_id],
-    references: [studentsTable.id]
+    fields: [savingsTable.student_id],
+    references: [studentsTable.id],
   }),
-  operator: one(usersTable, {
-    fields: [studentSavingsTable.operator_id],
-    references: [usersTable.id]
-  })
+  transactions: many(savingsTransactionsTable),
 }));
 
-// Export all tables for relation queries
-export const tables = {
-  users: usersTable,
-  students: studentsTable,
-  paymentTypeConfigs: paymentTypeConfigsTable,
-  studentPaymentAssignments: studentPaymentAssignmentsTable,
-  paymentTransactions: paymentTransactionsTable,
-  accounts: accountsTable,
-  fundSources: fundSourcesTable,
-  transactions: transactionsTable,
-  studentSavings: studentSavingsTable,
-  whatsappNotifications: whatsappNotificationsTable
-};
+export const savingsTransactionsRelations = relations(savingsTransactionsTable, ({ one }) => ({
+  savings: one(savingsTable, {
+    fields: [savingsTransactionsTable.savings_id],
+    references: [savingsTable.id],
+  }),
+}));
 
-// TypeScript types for the table schemas
-export type User = typeof usersTable.$inferSelect;
-export type NewUser = typeof usersTable.$inferInsert;
-export type Student = typeof studentsTable.$inferSelect;
-export type NewStudent = typeof studentsTable.$inferInsert;
-export type PaymentTypeConfig = typeof paymentTypeConfigsTable.$inferSelect;
-export type NewPaymentTypeConfig = typeof paymentTypeConfigsTable.$inferInsert;
-export type StudentPaymentAssignment = typeof studentPaymentAssignmentsTable.$inferSelect;
-export type NewStudentPaymentAssignment = typeof studentPaymentAssignmentsTable.$inferInsert;
-export type PaymentTransaction = typeof paymentTransactionsTable.$inferSelect;
-export type NewPaymentTransaction = typeof paymentTransactionsTable.$inferInsert;
-export type Account = typeof accountsTable.$inferSelect;
-export type NewAccount = typeof accountsTable.$inferInsert;
-export type FundSource = typeof fundSourcesTable.$inferSelect;
-export type NewFundSource = typeof fundSourcesTable.$inferInsert;
-export type Transaction = typeof transactionsTable.$inferSelect;
-export type NewTransaction = typeof transactionsTable.$inferInsert;
-export type StudentSavings = typeof studentSavingsTable.$inferSelect;
-export type NewStudentSavings = typeof studentSavingsTable.$inferInsert;
-export type WhatsappNotification = typeof whatsappNotificationsTable.$inferSelect;
-export type NewWhatsappNotification = typeof whatsappNotificationsTable.$inferInsert;
+export const sppCardsRelations = relations(sppCardsTable, ({ one }) => ({
+  student: one(studentsTable, {
+    fields: [sppCardsTable.student_id],
+    references: [studentsTable.id],
+  }),
+}));
+
+// Export all tables for drizzle
+export const tables = {
+  students: studentsTable,
+  paymentConfigs: paymentConfigsTable,
+  studentPayments: studentPaymentsTable,
+  accounts: accountsTable,
+  fundPositions: fundPositionsTable,
+  transactions: transactionsTable,
+  savings: savingsTable,
+  savingsTransactions: savingsTransactionsTable,
+  sppCards: sppCardsTable,
+  whatsappNotifications: whatsappNotificationsTable,
+};

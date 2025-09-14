@@ -7,41 +7,40 @@ import { z } from 'zod';
 
 // Import schemas
 import {
-  createUserInputSchema,
   createStudentInputSchema,
-  createPaymentTypeConfigInputSchema,
-  createStudentPaymentAssignmentInputSchema,
-  createPaymentTransactionInputSchema,
-  createAccountInputSchema,
-  createFundSourceInputSchema,
+  createPaymentConfigInputSchema,
   createTransactionInputSchema,
-  createStudentSavingsInputSchema,
-  createWhatsappNotificationInputSchema,
-  reportRequestSchema
+  createAccountInputSchema,
+  createFundPositionInputSchema,
+  createSavingsTransactionInputSchema,
+  processPaymentInputSchema,
+  generateSppCardInputSchema,
+  sendWhatsappNotificationInputSchema,
+  getStudentsQuerySchema,
+  getTransactionsQuerySchema,
+  getStudentPaymentsQuerySchema,
 } from './schema';
 
 // Import handlers
-import { createUser } from './handlers/create_user';
-import { getUsers } from './handlers/get_users';
 import { createStudent } from './handlers/create_student';
-import { getStudents, getStudentByBarcode } from './handlers/get_students';
-import { createPaymentTypeConfig } from './handlers/create_payment_type_config';
-import { getPaymentTypeConfigs } from './handlers/get_payment_type_configs';
-import { createStudentPaymentAssignment } from './handlers/create_student_payment_assignment';
-import { createPaymentTransaction, processPaymentByBarcode } from './handlers/create_payment_transaction';
-import { getPaymentTransactions, getStudentPaymentHistory } from './handlers/get_payment_transactions';
+import { getStudents } from './handlers/get_students';
+import { createPaymentConfig } from './handlers/create_payment_config';
+import { getPaymentConfigs } from './handlers/get_payment_configs';
+import { getStudentPayments } from './handlers/get_student_payments';
+import { processPayment } from './handlers/process_payment';
 import { createAccount } from './handlers/create_account';
-import { getAccounts, getAccountBalance } from './handlers/get_accounts';
-import { createFundSource } from './handlers/create_fund_source';
-import { getFundSources } from './handlers/get_fund_sources';
-import { createTransaction, createTransfer } from './handlers/create_transaction';
+import { getAccounts } from './handlers/get_accounts';
+import { createFundPosition } from './handlers/create_fund_position';
+import { getFundPositions } from './handlers/get_fund_positions';
+import { createTransaction } from './handlers/create_transaction';
 import { getTransactions } from './handlers/get_transactions';
-import { createStudentSavings } from './handlers/create_student_savings';
-import { getStudentSavings, getStudentSavingsBalance } from './handlers/get_student_savings';
-import { createWhatsappNotification, sendPaymentNotification, sendPaymentReminderNotification } from './handlers/create_whatsapp_notification';
-import { getWhatsappNotifications, getPendingWhatsappNotifications } from './handlers/get_whatsapp_notifications';
-import { generateReport, generateDailyIncomeReport, generateMonthlyRecapReport } from './handlers/generate_reports';
-import { generateSppCard, generateBarcodeForStudent, printReceipt } from './handlers/generate_spp_card';
+import { createSavingsTransaction } from './handlers/create_savings_transaction';
+import { getStudentSavings } from './handlers/get_student_savings';
+import { generateSppCard } from './handlers/generate_spp_card';
+import { scanBarcode } from './handlers/scan_barcode';
+import { sendWhatsappNotification } from './handlers/send_whatsapp_notification';
+import { getDailyReport, getMonthlyReport, getOutstandingPayments, getCashPositionReport } from './handlers/get_financial_reports';
+import { generateReceipt, printReceipt } from './handlers/print_receipt';
 
 const t = initTRPC.create({
   transformer: superjson,
@@ -56,139 +55,113 @@ const appRouter = router({
     return { status: 'ok', timestamp: new Date().toISOString() };
   }),
 
-  // User management
-  createUser: publicProcedure
-    .input(createUserInputSchema)
-    .mutation(({ input }) => createUser(input)),
-  getUsers: publicProcedure
-    .query(() => getUsers()),
-
   // Student management
   createStudent: publicProcedure
     .input(createStudentInputSchema)
     .mutation(({ input }) => createStudent(input)),
+
   getStudents: publicProcedure
-    .query(() => getStudents()),
-  getStudentByBarcode: publicProcedure
-    .input(z.object({ barcode: z.string() }))
-    .query(({ input }) => getStudentByBarcode(input.barcode)),
+    .input(getStudentsQuerySchema.optional())
+    .query(({ input }) => getStudents(input)),
 
-  // Payment type configuration
-  createPaymentTypeConfig: publicProcedure
-    .input(createPaymentTypeConfigInputSchema)
-    .mutation(({ input }) => createPaymentTypeConfig(input)),
-  getPaymentTypeConfigs: publicProcedure
-    .query(() => getPaymentTypeConfigs()),
+  // Payment configuration management
+  createPaymentConfig: publicProcedure
+    .input(createPaymentConfigInputSchema)
+    .mutation(({ input }) => createPaymentConfig(input)),
 
-  // Student payment assignments
-  createStudentPaymentAssignment: publicProcedure
-    .input(createStudentPaymentAssignmentInputSchema)
-    .mutation(({ input }) => createStudentPaymentAssignment(input)),
+  getPaymentConfigs: publicProcedure
+    .query(() => getPaymentConfigs()),
 
-  // Payment transactions
-  createPaymentTransaction: publicProcedure
-    .input(createPaymentTransactionInputSchema)
-    .mutation(({ input }) => createPaymentTransaction(input)),
-  processPaymentByBarcode: publicProcedure
-    .input(z.object({
-      barcode: z.string(),
-      paymentData: createPaymentTransactionInputSchema.omit({ student_id: true })
-    }))
-    .mutation(({ input }) => processPaymentByBarcode(input.barcode, input.paymentData)),
-  getPaymentTransactions: publicProcedure
-    .query(() => getPaymentTransactions()),
-  getStudentPaymentHistory: publicProcedure
-    .input(z.object({ studentId: z.number() }))
-    .query(({ input }) => getStudentPaymentHistory(input.studentId)),
+  // Student payment management
+  getStudentPayments: publicProcedure
+    .input(getStudentPaymentsQuerySchema.optional())
+    .query(({ input }) => getStudentPayments(input)),
+
+  processPayment: publicProcedure
+    .input(processPaymentInputSchema)
+    .mutation(({ input }) => processPayment(input)),
 
   // Account management
   createAccount: publicProcedure
     .input(createAccountInputSchema)
     .mutation(({ input }) => createAccount(input)),
+
   getAccounts: publicProcedure
     .query(() => getAccounts()),
-  getAccountBalance: publicProcedure
-    .input(z.object({ accountId: z.number() }))
-    .query(({ input }) => getAccountBalance(input.accountId)),
 
-  // Fund source management
-  createFundSource: publicProcedure
-    .input(createFundSourceInputSchema)
-    .mutation(({ input }) => createFundSource(input)),
-  getFundSources: publicProcedure
-    .query(() => getFundSources()),
+  // Fund position management
+  createFundPosition: publicProcedure
+    .input(createFundPositionInputSchema)
+    .mutation(({ input }) => createFundPosition(input)),
 
-  // General transactions
+  getFundPositions: publicProcedure
+    .query(() => getFundPositions()),
+
+  // Transaction management
   createTransaction: publicProcedure
     .input(createTransactionInputSchema)
     .mutation(({ input }) => createTransaction(input)),
-  createTransfer: publicProcedure
-    .input(z.object({
-      fromAccountId: z.number(),
-      toAccountId: z.number(),
-      amount: z.number().positive(),
-      description: z.string(),
-      operatorId: z.number()
-    }))
-    .mutation(({ input }) => createTransfer(input.fromAccountId, input.toAccountId, input.amount, input.description, input.operatorId)),
-  getTransactions: publicProcedure
-    .query(() => getTransactions()),
 
-  // Student savings
-  createStudentSavings: publicProcedure
-    .input(createStudentSavingsInputSchema)
-    .mutation(({ input }) => createStudentSavings(input)),
+  getTransactions: publicProcedure
+    .input(getTransactionsQuerySchema.optional())
+    .query(({ input }) => getTransactions(input)),
+
+  // Savings management
+  createSavingsTransaction: publicProcedure
+    .input(createSavingsTransactionInputSchema)
+    .mutation(({ input }) => createSavingsTransaction(input)),
+
   getStudentSavings: publicProcedure
     .input(z.object({ studentId: z.number() }))
     .query(({ input }) => getStudentSavings(input.studentId)),
-  getStudentSavingsBalance: publicProcedure
-    .input(z.object({ studentId: z.number() }))
-    .query(({ input }) => getStudentSavingsBalance(input.studentId)),
+
+  // SPP Card management
+  generateSppCard: publicProcedure
+    .input(generateSppCardInputSchema)
+    .mutation(({ input }) => generateSppCard(input)),
+
+  scanBarcode: publicProcedure
+    .input(z.object({ barcode: z.string() }))
+    .query(({ input }) => scanBarcode(input.barcode)),
 
   // WhatsApp notifications
-  createWhatsappNotification: publicProcedure
-    .input(createWhatsappNotificationInputSchema)
-    .mutation(({ input }) => createWhatsappNotification(input)),
-  sendPaymentNotification: publicProcedure
-    .input(z.object({
-      studentId: z.number(),
-      paymentAmount: z.number(),
-      receiptNumber: z.string()
-    }))
-    .mutation(({ input }) => sendPaymentNotification(input.studentId, input.paymentAmount, input.receiptNumber)),
-  sendPaymentReminderNotification: publicProcedure
-    .input(z.object({
-      studentId: z.number(),
-      paymentType: z.string(),
-      amount: z.number()
-    }))
-    .mutation(({ input }) => sendPaymentReminderNotification(input.studentId, input.paymentType, input.amount)),
-  getWhatsappNotifications: publicProcedure
-    .query(() => getWhatsappNotifications()),
-  getPendingWhatsappNotifications: publicProcedure
-    .query(() => getPendingWhatsappNotifications()),
+  sendWhatsappNotification: publicProcedure
+    .input(sendWhatsappNotificationInputSchema)
+    .mutation(({ input }) => sendWhatsappNotification(input)),
 
-  // Reports
-  generateReport: publicProcedure
-    .input(reportRequestSchema)
-    .query(({ input }) => generateReport(input)),
-  generateDailyIncomeReport: publicProcedure
-    .input(z.object({ date: z.coerce.date() }))
-    .query(({ input }) => generateDailyIncomeReport(input.date)),
-  generateMonthlyRecapReport: publicProcedure
-    .input(z.object({ year: z.number(), month: z.number().min(1).max(12) }))
-    .query(({ input }) => generateMonthlyRecapReport(input.year, input.month)),
+  // Financial reports
+  getDailyReport: publicProcedure
+    .input(z.object({ date: z.string() }))
+    .query(({ input }) => getDailyReport(input.date)),
 
-  // SPP cards and receipts
-  generateSppCard: publicProcedure
-    .input(z.object({ studentId: z.number() }))
-    .query(({ input }) => generateSppCard(input.studentId)),
-  generateBarcodeForStudent: publicProcedure
-    .input(z.object({ studentId: z.number() }))
-    .mutation(({ input }) => generateBarcodeForStudent(input.studentId)),
+  getMonthlyReport: publicProcedure
+    .input(z.object({ month: z.number().int().min(1).max(12), year: z.number().int() }))
+    .query(({ input }) => getMonthlyReport(input.month, input.year)),
+
+  getOutstandingPayments: publicProcedure
+    .input(z.object({ 
+      grade: z.string().optional(), 
+      className: z.string().optional() 
+    }).optional())
+    .query(({ input }) => getOutstandingPayments(input?.grade, input?.className)),
+
+  getCashPositionReport: publicProcedure
+    .query(() => getCashPositionReport()),
+
+  // Receipt printing
+  generateReceipt: publicProcedure
+    .input(z.object({ 
+      transactionId: z.number(), 
+      copies: z.number().int().positive().optional() 
+    }))
+    .query(({ input }) => generateReceipt(input.transactionId, input.copies)),
+
   printReceipt: publicProcedure
-    .input(z.object({ transactionId: z.number(), copies: z.number().min(1).default(1) }))
-    .query(({ input }) => printReceipt(input.transactionId, input.copies))
+    .input(z.object({
+      receiptData: z.any(), // Will be properly typed in actual implementation
+      copies: z.number().int().positive().optional()
+    }))
+    .mutation(({ input }) => printReceipt(input.receiptData, input.copies)),
 });
 
 export type AppRouter = typeof appRouter;
